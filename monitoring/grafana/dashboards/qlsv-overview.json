@@ -1,0 +1,1230 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Giám sát container, Nginx và MySQL của đề tài quản lý sinh viên. Số liệu thực từ Prometheus; thiếu dữ liệu không được thay bằng 0.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "title": "Cách đọc dashboard",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "**Container → Nginx → MySQL** trong bài QLSV. Bộ lọc **Dịch vụ** chỉ áp dụng cho hai biểu đồ container.\n\n**Thu thập thành công** nghĩa là Prometheus đọc được endpoint metrics; xem thêm **Nginx: đọc stub_status** và **MySQL: kết nối database** để kiểm tra phía dịch vụ. Không suy ra website CRUD hoạt động chỉ từ các trạng thái này.\n\nDữ liệu được thu thập mỗi **30 giây**. Sau khi khởi động, chờ khoảng **2 phút** để biểu đồ tốc độ có đủ mẫu. **No data / Không có dữ liệu** là chưa có số liệu, không phải giá trị 0; dashboard không thay số liệu bị thiếu bằng 0."
+      }
+    },
+    {
+      "id": 2,
+      "title": "Trạng thái thu thập của Prometheus",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 3,
+      "title": "Prometheus",
+      "type": "stat",
+      "description": "Prometheus thu thập endpoint của chính nó. 1 = thành công; 0 = lỗi; thiếu series = chưa có dữ liệu.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "noValue": "Không có dữ liệu",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Lỗi",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Thành công",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "up{job=\"prometheus\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "Prometheus",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "cAdvisor",
+      "type": "stat",
+      "description": "Prometheus đọc được endpoint cAdvisor. Trạng thái này chưa chứng minh đủ nhãn hoặc metrics của từng container.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "noValue": "Không có dữ liệu",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Lỗi",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Thành công",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "up{job=\"cadvisor\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "cAdvisor",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Nginx exporter",
+      "type": "stat",
+      "description": "Prometheus đọc được endpoint exporter; xem nginx_up bên dưới để biết exporter có đọc được Nginx hay không.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "noValue": "Không có dữ liệu",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Lỗi",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Thành công",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "up{job=\"nginx\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "Nginx exporter",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "MySQL exporter",
+      "type": "stat",
+      "description": "Prometheus đọc được endpoint exporter; xem mysql_up bên dưới để biết exporter có kết nối được database hay không.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 5,
+        "w": 6,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "noValue": "Không có dữ liệu",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Lỗi",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Thành công",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "up{job=\"mysql\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "MySQL exporter",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Container của dự án QLSV",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "title": "CPU theo dịch vụ",
+      "type": "timeseries",
+      "description": "100% tương ứng sử dụng hết một CPU logic; có thể lớn hơn 100% khi dùng nhiều CPU. Chỉ cộng container thuộc Compose project qlsv, nhóm theo dịch vụ.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "min": 0,
+          "noValue": "Không có dữ liệu",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisColorMode": "text",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "100 * sum by (container_label_com_docker_compose_service) (rate(container_cpu_usage_seconds_total{job=\"cadvisor\",container_label_com_docker_compose_project=\"qlsv\",container_label_com_docker_compose_service!=\"\",container_label_com_docker_compose_service=~\"${service:regex}\"}[$__rate_interval]))",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{container_label_com_docker_compose_service}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "RAM đang sử dụng theo dịch vụ",
+      "type": "timeseries",
+      "description": "Working set do cAdvisor đo, tính bằng byte; không phải tổng RAM của máy ảo. Chỉ các container thuộc Compose project qlsv.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "decimals": 2,
+          "min": 0,
+          "noValue": "Không có dữ liệu",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisColorMode": "text",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum by (container_label_com_docker_compose_service) (container_memory_working_set_bytes{job=\"cadvisor\",container_label_com_docker_compose_project=\"qlsv\",container_label_com_docker_compose_service!=\"\",container_label_com_docker_compose_service=~\"${service:regex}\"})",
+          "instant": false,
+          "range": true,
+          "legendFormat": "{{container_label_com_docker_compose_service}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Web server Nginx",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 11,
+      "title": "Nginx: đọc stub_status",
+      "type": "stat",
+      "description": "Exporter đọc được stub_status của Nginx. Chỉ số này không kiểm tra đăng nhập hoặc CRUD của Django.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 6,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "noValue": "Không có dữ liệu",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Lỗi",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Thành công",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "nginx_up{job=\"nginx\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "Nginx: đọc stub_status",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Yêu cầu HTTP mỗi giây",
+      "type": "timeseries",
+      "description": "Toàn bộ yêu cầu Nginx xử lý, gồm trình duyệt, healthcheck và lần đọc stub_status. Vì vậy có thể có lưu lượng khi chưa thao tác website.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 19,
+        "w": 10,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "decimals": 2,
+          "min": 0,
+          "noValue": "Không có dữ liệu",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisColorMode": "text",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(nginx_http_requests_total{job=\"nginx\"}[$__rate_interval])",
+          "instant": false,
+          "range": true,
+          "legendFormat": "Nginx",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Kết nối Nginx hiện tại",
+      "type": "timeseries",
+      "description": "Số kết nối client đang mở, bao gồm kết nối giữ chờ; không phải số người dùng đang đăng nhập.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 19,
+        "w": 8,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "noValue": "Không có dữ liệu",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisColorMode": "text",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "nginx_connections_active{job=\"nginx\"}",
+          "instant": false,
+          "range": true,
+          "legendFormat": "Kết nối đang mở",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Database MySQL",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "title": "MySQL: kết nối database",
+      "type": "stat",
+      "description": "mysqld_exporter kết nối và ping được MySQL. Không thay thế kiểm tra dữ liệu hoặc giao dịch CRUD của ứng dụng.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 6,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "max": 1,
+          "noValue": "Không có dữ liệu",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Lỗi",
+                  "color": "red",
+                  "index": 0
+                },
+                "1": {
+                  "text": "Thành công",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "mysql_up{job=\"mysql\"}",
+          "instant": true,
+          "range": false,
+          "legendFormat": "MySQL: kết nối database",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Kết nối MySQL hiện tại",
+      "type": "timeseries",
+      "description": "Số kết nối đang mở trên MySQL của bài, gồm ứng dụng, phpMyAdmin và exporter.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 28,
+        "w": 6,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "min": 0,
+          "noValue": "Không có dữ liệu",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisColorMode": "text",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "mysql_global_status_threads_connected{job=\"mysql\"}",
+          "instant": false,
+          "range": true,
+          "legendFormat": "Kết nối đang mở",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "title": "Truy vấn MySQL mỗi giây",
+      "type": "timeseries",
+      "description": "Tốc độ bộ đếm Queries trên toàn MySQL container, không chỉ schema qlsv; có cả truy vấn phục vụ giám sát.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 28,
+        "w": 6,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix:truy vấn/s",
+          "decimals": 2,
+          "min": 0,
+          "noValue": "Không có dữ liệu",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisColorMode": "text",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_queries{job=\"mysql\"}[$__rate_interval])",
+          "instant": false,
+          "range": true,
+          "legendFormat": "Truy vấn",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "Truy vấn chậm mỗi giây",
+      "type": "timeseries",
+      "description": "Tốc độ bộ đếm Slow_queries của MySQL. Giá trị 0 là bình thường khi chưa phát sinh truy vấn chậm; No data nghĩa là thiếu metrics.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "qlsv-prometheus"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 28,
+        "w": 6,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix:truy vấn/s",
+          "decimals": 2,
+          "min": 0,
+          "noValue": "Không có dữ liệu",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "auto",
+            "pointSize": 4,
+            "spanNulls": false,
+            "insertNulls": false,
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "axisColorMode": "text",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "qlsv-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rate(mysql_global_status_slow_queries{job=\"mysql\"}[$__rate_interval])",
+          "instant": false,
+          "range": true,
+          "legendFormat": "Truy vấn chậm",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "qlsv",
+    "docker-compose",
+    "moc-2"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Dịch vụ container",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "qlsv-prometheus"
+        },
+        "definition": "label_values(container_memory_working_set_bytes{job=\"cadvisor\",container_label_com_docker_compose_project=\"qlsv\",container_label_com_docker_compose_service!=\"\"}, container_label_com_docker_compose_service)",
+        "query": {
+          "query": "label_values(container_memory_working_set_bytes{job=\"cadvisor\",container_label_com_docker_compose_project=\"qlsv\",container_label_com_docker_compose_service!=\"\"}, container_label_com_docker_compose_service)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": [],
+        "regex": "",
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "30s",
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "timezone": "Asia/Ho_Chi_Minh",
+  "title": "QLSV - Giám sát hệ thống",
+  "uid": "qlsv-overview",
+  "version": 1,
+  "weekStart": "monday"
+}

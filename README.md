@@ -1,8 +1,10 @@
 # Đề tài 2 — Hệ thống quản lý sinh viên
 
-Bộ mã nguồn mốc 1: website Django quản lý lớp, sinh viên, môn học và điểm; MySQL lưu dữ liệu; phpMyAdmin quản trị database; Nginx tiếp nhận truy cập. Tất cả dịch vụ chạy bằng Docker Compose trên Ubuntu.
+Bộ mã nguồn mốc 1 và 2: website Django quản lý lớp, sinh viên, môn học và điểm; MySQL lưu dữ liệu; phpMyAdmin quản trị database; Nginx tiếp nhận truy cập. Mốc 2 bổ sung Prometheus/Grafana và exporters. Tất cả dịch vụ chạy bằng Docker Compose trên Ubuntu.
 
-Mốc này chưa hoàn thành toàn bộ đề tài. Prometheus + Grafana, Loki + Promtail, 2–3 truy vấn LogQL và báo cáo tối thiểu 10 trang sẽ được bổ sung ở các mốc sau.
+Mốc 1 đã có bằng chứng chạy trên VM và giữ dữ liệu sau restart. Mốc 2 có mã/config và hướng dẫn, cần kiểm chứng số liệu thật trên VM. Loki + Promtail, 2–3 truy vấn LogQL và báo cáo tối thiểu 10 trang là phần còn lại. Không coi mã nguồn có sẵn là bằng chứng mọi mốc đã hoạt động.
+
+**Đang nâng cấp từ mốc 1:** làm theo [hướng dẫn mốc 2](docs/sdlc/moc-2/guide.md), lưu commit 1 trước khi giải nén bản mới. Sau nâng cấp, dùng `bash scripts/monitoring.sh ...` để quản lý cả chín dịch vụ; `sudo docker compose ...` một file chỉ quản lý phần mốc 1.
 
 ## 1. Môi trường và cấu trúc
 
@@ -149,6 +151,10 @@ Chỉ chia sẻ thông báo lỗi liên quan, kiểm tra và che mật khẩu ho
 | Sai mật khẩu phpMyAdmin | Dùng user/password MySQL trong `.env`, không dùng tài khoản Django |
 | Trang web từ Windows không mở | Mở trình duyệt bên trong Ubuntu; bộ cấu hình mặc định chỉ cho localhost Ubuntu |
 
+Nếu `localhost:8080` hiện WordPress hoặc một bài lab khác, kiểm tra `sudo docker ps --format 'table {{.Names}}\t{{.Ports}}'`. Chỉ tắt các container của bài cũ khi bạn đã xác nhận không cần chúng; không dùng lệnh dừng toàn bộ Docker. Trong môi trường đã được người dùng xác nhận ở bài này, WordPress dùng 8080 và cAdvisor dùng 8081.
+
+Bản sửa ngày 2026-10-01: phpMyAdmin nối cả `edge` và `data` để port publishing hoạt động. Healthcheck thêm `php -d allow_url_fopen=1` vì image tắt HTTP stream wrapper mặc định; chỉ probe được bật, cấu hình PHP phục vụ web giữ nguyên. Người đã giải nén bản đầu có thể thay riêng `compose.yaml`, giữ `.env` và database, rồi chạy `sudo docker compose up -d --wait --wait-timeout 300`.
+
 Không dùng xóa volume hoặc xóa dữ liệu như cách sửa lỗi mặc định.
 
 ## 8. Bảo mật trong mốc 1
@@ -193,10 +199,34 @@ git commit -m "feat: trien khai CRUD sinh vien voi MySQL va Nginx"
 
 `git check-ignore .env` cần in `.env`; danh sách file chờ commit không được có `.env`, mật khẩu, bản sao database hoặc dữ liệu cá nhân. Không dùng `git add -f .env`. Bước này mới tạo commit ở Ubuntu; tạo repository GitHub và push sẽ làm sau khi có MSSV/tài khoản của bạn theo yêu cầu đề.
 
-## 10. Các mốc tiếp theo
+## 10. Mốc 2 — giám sát
 
-1. Mốc 2: Prometheus + Grafana, dashboard có dữ liệu giám sát container, web server và database; commit có ý nghĩa.
-2. Mốc 3: Loki + Promtail, thu thập log và trình diễn 2–3 truy vấn LogQL; commit có ý nghĩa.
-3. Hoàn thiện minh chứng 3–4 biện pháp hardening, README, GitHub và báo cáo tối thiểu 10 trang; diễn tập demo toàn bộ hệ thống.
+[Hướng dẫn cài, kiểm tra và commit 2](docs/sdlc/moc-2/guide.md) mô tả đầy đủ thao tác. Trên mốc 1 đang chạy, sau khi chép bộ bổ sung:
+
+```bash
+python3 scripts/init_monitoring.py
+bash scripts/setup_monitoring.sh
+bash scripts/monitoring.sh config --quiet
+bash scripts/monitoring.sh up -d --wait --wait-timeout 300
+bash scripts/monitoring.sh ps
+```
+
+| Dịch vụ | Image đã chọn | Vai trò |
+|---|---|---|
+| prometheus | prom/prometheus:v3.13.3 | Thu thập metrics mỗi30s; localhost9090 |
+| grafana | grafana/grafana:12.4.12 | Dashboard nạp sẵn; localhost3000 |
+| cadvisor | ghcr.io/google/cadvisor:0.56.2 | Metrics container có nhãn Composeqlsv |
+| nginx-exporter | nginx/nginx-prometheus-exporter:1.5.3 | Đọc stub_status nội bộ8082 |
+| mysql-exporter | prom/mysqld-exporter:v0.19.0 | Đọc trạng thái/biến MySQL bằng user riêng |
+
+Mở [Targets](http://localhost:9090/targets) để xem4jobsUP; kiểm tra thêm `nginx_up=1`, `mysql_up=1` và CPU/RAM của các dịch vụ qlsv. Mở [dashboard Grafana](http://localhost:3000/d/qlsv-overview), dùng `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` trong.env. Biến môi trường này chỉ khởi tạo mật khẩu Grafana khi volume mới; sửa.env không tự đổi mật khẩu Grafana đã lưu.
+
+Prometheus giữ tối đa1ngày hoặc512MB blockmetrics (WAL/head có thể dùng thêm đĩa). Giới hạn RAM của5dịch vụ giám sát tổng800MiB; đây là giới hạn, không phải số đo đã chạy. cAdvisor có quyền host/privileged để đọc số liệu; các exporter không publish cổng. User MySQL giám sát chỉ có quyền metadata, không SELECT/UPDATE bảng sinh viên. Thiết kế và nguồn upstream trong [design.md](docs/sdlc/moc-2/design.md).
+
+## 11. Phần còn lại
+
+1. Kiểm chứng dashboard mốc2 trênVM và lưu commit2.
+2. Mốc3: Loki + Promtail, thu thập log và trình diễn2–3truy vấn LogQL; commit3.
+3. Hoàn thiện minh chứng3–4biện pháp hardening, GitHub và báo cáo tối thiểu10trang; diễn tập demo toàn bộ hệ thống.
 
 Giữ lại ảnh và ghi chú kết quả từ mỗi mốc để viết báo cáo theo triển khai thực tế.
