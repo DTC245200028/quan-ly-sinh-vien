@@ -18,4 +18,8 @@ Môi trường do người dùng cung cấp: Ubuntu26.04.1 trên VMware, Docker2
 
 Lỗi đã gặp: WordPress/cAdvisor bài cũ chiếm8080/8081; người dùng yêu cầu dừng bài cũ. phpMyAdmin đã sửa networkedge+data và probePHPCLI allow_url_fopen. Nginx bị mất attachment(networks={}), tạo lại riêng container theoCompose; ảnh mới cho thấy healthy và HTTP200.
 
-Cảnh báo phpMyAdmin không có cột duy nhất ở kết quảJOIN nói về chỉnh sửa lưới, không chứng minh truy vấn thất bại. Không suy rộng các bằng chứng này sang mốc2/mốc3 chưa chạy.
+Cảnh báo phpMyAdmin không có cột duy nhất ở kết quảJOIN nói về chỉnh sửa lưới, không chứng minh truy vấn thất bại. Không suy rộng các bằng chứng này sang mốc2/mốc3 chưa chạy tại lần ghi nhận đầu tiên.
+
+## Cập nhật ngày 2026-10-02
+
+Ảnh mới xác nhận commit 1 `2fa2384` trên nhánh `master`; cả ba commit mốc đã được ghi nhận. Bốn nhóm hardening và các phép kiểm tra riêng cho `.env` đã có bằng chứng VM tại [kiểm tra cuối](../final-verification/operations.md). Các mục chưa xác minh tương ứng trong bảng đầu là trạng thái lịch sử. GitHub và các ca CRUD/validation còn thiếu vẫn chưa được xác minh.

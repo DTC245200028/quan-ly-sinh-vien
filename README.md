@@ -1,220 +1,84 @@
 # Đề tài 2 — Hệ thống quản lý sinh viên
 
-Bộ mã nguồn mốc 1–3: website Django quản lý lớp, sinh viên, môn học và điểm; MySQL lưu dữ liệu; phpMyAdmin quản trị database; Nginx tiếp nhận truy cập. Mốc 2 bổ sung Prometheus/Grafana và exporters; mốc 3 bổ sung Loki/Promtail và LogQL. Tất cả dịch vụ chạy bằng Docker Compose trên Ubuntu.
+| Thông tin | Nội dung |
+|---|---|
+| Sinh viên | Lâm Duy Lập |
+| MSSV | DTC245200028 |
+| Tài khoản GitHub đã xác nhận | `DTC245200028` |
+| Học phần | Triển khai và quản trị hệ thống phần mềm |
+| Đề tài | Hệ thống quản lý sinh viên |
 
-Mốc 1 đã có bằng chứng chạy trên VM và giữ dữ liệu sau restart. Mốc 2 đã có dashboard với số liệu container, Nginx và MySQL; xem [minh chứng mốc 2](docs/sdlc/moc-2/runtime-evidence.md). Commit 1 trên VM đã được xác nhận (`2fa2384`); commit 2 chưa được xác nhận. Mốc 3 đã có bộ mã và hướng dẫn ở workspace, đang chờ triển khai và kiểm tra log thật trên VM. Báo cáo và kiểm chứng các yêu cầu còn lại chưa hoàn tất.
+Website Django quản lý lớp, sinh viên, môn học và điểm trên MySQL. Toàn bộ hệ thống gồm 11 dịch vụ Docker Compose: ứng dụng, database, quản trị database, reverse proxy, giám sát và thu log tập trung.
 
-**Đang nâng cấp từ mốc 2:** làm theo [hướng dẫn mốc 3](docs/sdlc/moc-3/guide.md), lưu commit 2 trước khi giải nén bản mới. Sau nâng cấp, dùng `bash scripts/logging.sh ...` để quản lý đủ 11 dịch vụ. Wrapper này ghép cả ba file Compose và tự dùng `sudo` khi cần.
+## 1. Trạng thái và bằng chứng
 
-**Cài từ đầu:** hoàn thành mốc 1 bên dưới, tiếp tục [hướng dẫn mốc 2](docs/sdlc/moc-2/guide.md), rồi mốc 3. Các mục 2–5 và 9 là hướng dẫn dựng mốc 1; không tạo lại `.env`, tài khoản hay commit 1 khi đã làm xong.
+Các kết quả dưới đây dựa trên ảnh, output và xác nhận từ máy Ubuntu VMware của sinh viên:
 
-## 1. Môi trường và cấu trúc
+| Phần | Bằng chứng đã có |
+|---|---|
+| Website và database | Đăng nhập Django/phpMyAdmin, giao diện có CSS, `/healthz` trả HTTP 200, dữ liệu sinh viên và điểm còn sau restart |
+| Giám sát | Bốn target thu thập thành công; CPU/RAM container, Nginx và MySQL có số liệu; `nginx_up` và `mysql_up` thành công |
+| Log | Script tìm thấy request thử nghiệm mới trong Loki; ba truy vấn LogQL có kết quả; giữ log cũ và nhận log mới sau restart Loki/Promtail |
+| Hardening | Bốn nhóm kiểm tra đạt: app non-root, hạn chế quyền app, database không publish cổng/mạng nội bộ, security headers |
+| File bí mật | `.env` quyền `600`, được Git bỏ qua; kiểm tra file đang theo dõi và lịch sử Git không thấy `.env` |
 
-Máy đích là Ubuntu trong VMware. Docker và Docker Compose đã được cài và chạy thành công `hello-world`; không cần cài lại. Với 4 CPU, RAM khoảng 3,3 GiB và 17 GB ổ đĩa trống, làm mốc 1 trước; khi thêm giám sát và log, nên tăng RAM lên 8 GB nếu máy thật đáp ứng được.
+Ba commit theo mốc đã được xác nhận trên nhánh `master` của VM:
+
+| Commit | Nội dung |
+|---|---|
+| `2fa2384` | Website CRUD, MySQL, phpMyAdmin, Nginx |
+| `efb31b9` | Prometheus, Grafana và giám sát |
+| `e00c2c1` | Loki, Promtail và truy vấn LogQL |
+
+Chi tiết: [minh chứng mốc 1](docs/sdlc/moc-1/runtime-evidence.md), [mốc 2](docs/sdlc/moc-2/runtime-evidence.md), [mốc 3](docs/sdlc/moc-3/runtime-evidence.md), [kiểm tra cuối](docs/sdlc/final-verification/operations.md). Các mục có ngày ghi nhận sau cập nhật trạng thái của các mục trước.
+
+Chưa xác nhận push repository lên GitHub hoặc hoàn thành báo cáo. Một số ca xóa/validation CRUD và kiểm tra lại đầy đủ dashboard sau nâng cấp còn cần bổ sung bằng chứng; không suy ra các ca này đã đạt chỉ từ healthcheck.
+
+## 2. Kiến trúc và chức năng
 
 ```text
-Trình duyệt bên trong Ubuntu
- ├─ localhost:8080 → Nginx → Django/Gunicorn → MySQL
- └─ localhost:8081 → phpMyAdmin ─────────────→ MySQL
+Trình duyệt trong Ubuntu
+ ├─ :8080 → Nginx → Django/Gunicorn → MySQL
+ ├─ :8081 → phpMyAdmin ─────────────→ MySQL
+ ├─ :9090 → Prometheus ← cAdvisor / Nginx exporter / MySQL exporter
+ └─ :3000 → Grafana → Prometheus và Loki
+                         Loki ← Promtail ← Docker JSON logs của dự án qlsv
 ```
 
-| Thành phần | Dịch vụ Compose | Vai trò |
-|---|---|---|
-| Django 5.2 + Gunicorn | `app` | Đăng nhập quản trị và CRUD |
-| MySQL 8.4 | `db` | Lưu dữ liệu trong volume `mysql_data` |
-| Nginx | `nginx` | Reverse proxy, phục vụ CSS và security headers |
-| phpMyAdmin | `phpmyadmin` | Xem dữ liệu MySQL qua trình duyệt |
+| Nhóm | Dịch vụ Compose |
+|---|---|
+| Website và database | `app`, `db`, `nginx`, `phpmyadmin` |
+| Giám sát | `prometheus`, `grafana`, `cadvisor`, `nginx-exporter`, `mysql-exporter` |
+| Log | `loki`, `promtail` |
 
-Website dùng Django Admin tiếng Việt. Danh mục môn học hỗ trợ nhập điểm; mỗi cặp sinh viên–môn học có một điểm từ 0 đến 10. Chưa có học kỳ, lần thi hoặc cổng riêng cho sinh viên.
+Website dùng Django 5.2 Admin tiếng Việt, MySQL 8.4 và có CRUD lớp, sinh viên, môn học, điểm. Có tìm kiếm sinh viên theo mã/tên và lọc theo lớp; mỗi cặp sinh viên–môn học có một điểm từ 0 đến 10. Các bản ghi đang được tham chiếu được bảo vệ khi xóa. Chưa có học kỳ, lần thi hoặc cổng riêng cho sinh viên.
 
-## 2. Chuyển mã nguồn vào Ubuntu
+Mạng `data` là mạng nội bộ của database; MySQL không publish cổng ra host. Các cổng web, phpMyAdmin, Grafana, Prometheus và Loki chỉ bind `127.0.0.1`. Nginx dùng security headers theo lựa chọn của đề; bài lab chưa triển khai HTTPS hoặc công bố ra Internet.
 
-Tải `quan-ly-sinh-vien-moc-1.zip` từ bộ bàn giao trên máy Windows. Chuyển ZIP vào thư mục `Downloads` của Ubuntu bằng kéo thả nếu VMware hỗ trợ; nếu không, dùng thư mục chia sẻ VMware hoặc USB. Không giải nén rồi chép từng file vì có thể bỏ sót các file ẩn.
+## 3. Cài mới từ repository đã clone
 
-Mở Terminal **trong Ubuntu**. Thư mục `~/quan-ly-sinh-vien` đã tạo phải còn trống ở lần giải nén đầu:
+Mở Terminal **trong thư mục repository đã clone**, nơi có `compose.yaml`, `app/`, `scripts/` và `README.md`. Chạy lần lượt ba bước dưới đây; khi một lệnh lỗi, xem thông báo trước khi chuyển sang bước tiếp theo.
 
-```bash
-cd ~/quan-ly-sinh-vien
-unzip ~/Downloads/quan-ly-sinh-vien-moc-1.zip -d ~/quan-ly-sinh-vien
-ls -a
-```
+Cần Docker Engine, Docker Compose, Python 3, Git và curl. Môi trường đã dùng: Ubuntu 26.04.1 trên VMware, Docker 29.1.3, Compose 2.40.3, 4 CPU và RAM khoảng 3,3 GiB. Ảnh sau mốc 3 cho thấy khoảng 1,3 GiB RAM `available`; đây là số đo tại một thời điểm. Có thể tăng RAM lên 8 GB nếu máy thật cho phép để demo thuận tiện hơn. Kiểm tra dung lượng bằng `df -h /` trước khi tải image.
 
-Nếu `unzip` chưa có, chạy `sudo apt update` và `sudo apt install -y unzip` rồi giải nén lại. Nếu ZIP nằm ở thư mục khác, thay đường dẫn `~/Downloads/...` bằng vị trí thật. Sau giải nén, `compose.yaml`, `README.md`, `.env.example`, `app/`, `nginx/` và `scripts/` phải nằm trực tiếp trong `~/quan-ly-sinh-vien`.
+Nếu đang dùng VM đã triển khai xong, chuyển đến mục vận hành; không tạo lại `.env`, tài khoản hoặc database. Không cần cài Django/MySQL trực tiếp lên Ubuntu vì các thành phần chạy trong container.
 
-Từ đây, chạy tất cả lệnh tại `~/quan-ly-sinh-vien`. Không chạy lại bước giải nén đè lên dự án đã chỉnh sửa hoặc có dữ liệu mà chưa kiểm tra nội dung.
-
-## 3. Tạo cấu hình và khởi động
-
-Tạo `.env` một lần, bằng tài khoản Ubuntu thông thường:
+### Bước A — Website và database
 
 ```bash
-cd ~/quan-ly-sinh-vien
 python3 scripts/init_env.py
 sudo docker compose config --quiet
 sudo docker compose up -d --build --wait --wait-timeout 300
-sudo docker compose ps
-```
-
-Script tự tạo mật khẩu và khóa bí mật ngẫu nhiên, đặt quyền `.env` là `600` trên Ubuntu và từ chối ghi đè nếu file đã tồn tại. Nếu báo file đã tồn tại, giữ nguyên file và tiếp tục kiểm tra cấu hình. Không dùng `.env.example` làm file mật khẩu thật, không gửi nội dung `.env` lên chat hoặc GitHub.
-
-Lần chạy đầu cần Internet để tải image và thư viện. `config --quiet` thành công sẽ không in nội dung cấu hình hay mật khẩu. `up --wait` chờ dịch vụ đạt trạng thái chạy hoặc khỏe theo healthcheck; lần đầu có thể mất vài phút. Cách dùng tham số theo [tài liệu Docker Compose](https://docs.docker.com/reference/cli/docker/compose/up/).
-
-Nếu `up` báo lỗi, dừng ở bước này và xem mục xử lý lỗi bên dưới; chưa tạo tài khoản khi `app` chưa chạy. Khi khởi động, ứng dụng tự áp dụng migrations và gom static files vào volume `static_data` để Nginx phục vụ.
-
-## 4. Tạo tài khoản và dữ liệu mẫu
-
-```bash
 sudo docker compose exec app python manage.py createsuperuser
-```
-
-Nhập tên đăng nhập, email và mật khẩu quản trị do bạn chọn. Khi nhập mật khẩu, Terminal không hiện ký tự; đó là bình thường. Chọn mật khẩu đạt yêu cầu thay vì bỏ qua cảnh báo. Tài khoản này dùng cho website Django. Lệnh được mô tả trong [tài liệu Django](https://docs.djangoproject.com/en/5.2/ref/django-admin/#createsuperuser).
-
-Sau đó tạo dữ liệu giả để thực hành:
-
-```bash
 sudo docker compose exec app python manage.py seed_demo
 sudo docker compose ps
 ```
 
-Với database mới, lệnh tạo 2 lớp, 3 môn học, 6 sinh viên và 18 điểm. Chạy lại chỉ bổ sung bản ghi còn thiếu, không tạo trùng hoặc ghi đè những giá trị bạn đã sửa.
+Script tạo `.env` với bí mật ngẫu nhiên và quyền `600`, từ chối ghi đè file đã tồn tại. Không sao chép `.env.example` thành file mật khẩu thật. Khi nhập mật khẩu cho `createsuperuser`, Terminal không hiện ký tự; tài khoản này dùng để đăng nhập website.
 
-Mở trình duyệt **bên trong Ubuntu**:
+Ứng dụng tự chạy migrations và thu static files khi khởi động. Với database mới, `seed_demo` tạo 2 lớp, 3 môn, 6 sinh viên và 18 điểm giả; chạy lại chỉ bổ sung bản ghi thiếu, không ghi đè dữ liệu đã sửa.
 
-| Địa chỉ | Cách dùng |
-|---|---|
-| [Website](http://localhost:8080) | Đăng nhập bằng tài khoản vừa tạo; trang gốc chuyển đến `/admin/` |
-| [phpMyAdmin](http://localhost:8081) | Dùng `MYSQL_USER` và `MYSQL_PASSWORD` trong `.env`; server là `db` nếu có ô hỏi |
-| [Kiểm tra sức khỏe](http://localhost:8080/healthz) | Phải trả HTTP 200 và `{"status":"ok"}` khi ứng dụng kết nối được database |
-
-Để đọc thông tin đăng nhập phpMyAdmin, mở thư mục dự án trong Files của Ubuntu, nhấn `Ctrl+H` để hiện file ẩn rồi mở `.env` bằng trình soạn thảo. Mặc định tên user là `qlsv_app`, database là `qlsv`. Không dùng tài khoản MySQL `root` để demo. Tài khoản MySQL và tài khoản quản trị website là hai tài khoản khác nhau.
-
-Hai cổng chỉ lắng nghe trên `127.0.0.1` của Ubuntu. `localhost` trong trình duyệt Windows là máy Windows, nên dùng trình duyệt trong Ubuntu với bộ cấu hình này.
-
-## 5. Kiểm tra và lấy ảnh minh chứng
-
-Làm theo [kịch bản demo mốc 1](docs/sdlc/moc-1/demo.md). Các kết quả cần đạt:
-
-- Đăng nhập được, giao diện quản trị có CSS; xem, thêm, sửa, xóa lớp, sinh viên, môn học và điểm.
-- Tìm sinh viên theo mã hoặc tên, lọc theo lớp; điểm ngoài 0–10 và cặp sinh viên–môn học trùng bị từ chối.
-- Không xóa được lớp còn sinh viên hoặc sinh viên/môn học còn điểm tham chiếu; thử trên dữ liệu giả.
-- Dữ liệu vừa nhập xuất hiện trong phpMyAdmin và vẫn còn sau khi khởi động lại dịch vụ.
-- Nginx trả security headers; ứng dụng chạy bằng user khác root; MySQL không có cổng công bố ra host.
-
-Chạy kiểm tra nhanh trong Terminal:
-
-```bash
-curl -i http://localhost:8080/healthz
-curl -I http://localhost:8080/admin/login/
-sudo docker compose exec app id
-sudo docker compose ps
-```
-
-Nếu chưa có `curl`, cài bằng `sudo apt install -y curl`. Ghi lại kết quả thực tế trên máy Ubuntu; việc có sẵn mã nguồn không phải bằng chứng triển khai thành công.
-
-## 6. Dừng, chạy lại và giữ dữ liệu
-
-Chọn wrapper theo mốc đã cài để quản lý đủ dịch vụ:
-
-| Mốc đang dùng | Tiền tố lệnh |
-|---|---|
-| Mốc 1 — 4 dịch vụ | `sudo docker compose` |
-| Mốc 2 — 9 dịch vụ | `bash scripts/monitoring.sh` |
-| Mốc 3 — 11 dịch vụ | `bash scripts/logging.sh` |
-
-Ví dụ sau dành cho hệ thống đã lên mốc 3; ở mốc 1 hoặc 2, thay tiền tố bằng dòng tương ứng trong bảng. Tạm dừng khi không học:
-
-```bash
-bash scripts/logging.sh stop
-```
-
-Chạy lại:
-
-```bash
-bash scripts/logging.sh up -d --wait --wait-timeout 300
-python3 scripts/check_logging.py
-```
-
-Lệnh `check_logging.py` chỉ chạy khi đã cài mốc 3.
-
-Có thể dùng `down` với tiền tố đúng mốc để gỡ container và mạng của bộ Compose; named volumes vẫn được giữ. **Không thêm `-v`** khi muốn giữ database: tùy chọn đó xóa named volumes, làm mất dữ liệu và tài khoản web. Xem [phân biệt các tùy chọn `down`](https://docs.docker.com/reference/cli/docker/compose/down/).
-
-Giữ nguyên `.env` và tên dự án Compose `qlsv` để sử dụng đúng database đã khởi tạo. Đổi mật khẩu trong `.env` không tự đổi mật khẩu đã lưu trong MySQL volume. Không xóa `.env` rồi tạo lại để xử lý lỗi đăng nhập.
-
-## 7. Khi có lỗi
-
-Các lệnh sau xem lỗi của bốn dịch vụ mốc 1. Với lỗi giám sát hoặc log, dùng wrapper và mục xử lý lỗi trong [hướng dẫn mốc 2](docs/sdlc/moc-2/guide.md) hoặc [mốc 3](docs/sdlc/moc-3/guide.md).
-
-```bash
-cd ~/quan-ly-sinh-vien
-sudo docker compose ps -a
-sudo docker compose logs --tail=80 db app nginx phpmyadmin
-free -h
-df -h /
-```
-
-Chỉ chia sẻ thông báo lỗi liên quan, kiểm tra và che mật khẩu hoặc thông tin riêng trước khi gửi. Không gửi `.env`, không chạy `docker compose config` không có `--quiet` để chia sẻ cấu hình vì có thể lộ bí mật.
-
-| Biểu hiện | Việc nên kiểm tra |
-|---|---|
-| Báo không tìm thấy file Compose | Chạy `pwd`; phải ở `~/quan-ly-sinh-vien` và có `compose.yaml` |
-| Build hoặc tải image lỗi | Xem lỗi mạng/tên image/dung lượng; giữ nguyên log lỗi đầu tiên |
-| Chờ quá 300 giây | Xem `ps -a` và log; VM ít RAM có thể khởi tạo MySQL chậm |
-| `port is already allocated` | Kiểm tra chương trình đang dùng cổng 8080/8081; chưa đổi cổng hoặc CSRF origin tùy ý |
-| Website trả 502/503 | Xem trạng thái và log `app`, `db`, rồi `nginx` |
-| Sai mật khẩu phpMyAdmin | Dùng user/password MySQL trong `.env`, không dùng tài khoản Django |
-| Trang web từ Windows không mở | Mở trình duyệt bên trong Ubuntu; bộ cấu hình mặc định chỉ cho localhost Ubuntu |
-
-Nếu `localhost:8080` hiện WordPress hoặc một bài lab khác, kiểm tra `sudo docker ps --format 'table {{.Names}}\t{{.Ports}}'`. Chỉ tắt các container của bài cũ khi bạn đã xác nhận không cần chúng; không dùng lệnh dừng toàn bộ Docker. Trong môi trường đã được người dùng xác nhận ở bài này, WordPress dùng 8080 và cAdvisor dùng 8081.
-
-Bản sửa ngày 2026-10-01: phpMyAdmin nối cả `edge` và `data` để port publishing hoạt động. Healthcheck thêm `php -d allow_url_fopen=1` vì image tắt HTTP stream wrapper mặc định; chỉ probe được bật, cấu hình PHP phục vụ web giữ nguyên. Người đã giải nén bản đầu có thể thay riêng `compose.yaml`, giữ `.env` và database, rồi chạy `sudo docker compose up -d --wait --wait-timeout 300`.
-
-Không dùng xóa volume hoặc xóa dữ liệu như cách sửa lỗi mặc định.
-
-## 8. Bảo mật trong mốc 1
-
-Bài thực hành dùng HTTP trên localhost với security headers, tương ứng lựa chọn security headers của đề. Đây chưa phải cấu hình HTTPS để công bố website ra Internet.
-
-| Biện pháp | Cách kiểm chứng |
-|---|---|
-| Container ứng dụng chạy non-root | `sudo docker compose exec app id` có UID khác 0 |
-| Database ở mạng nội bộ, không công bố cổng | Kiểm tra Compose và `docker inspect`; không có ánh xạ cổng host cho MySQL |
-| Mật khẩu ngẫu nhiên, cấu hình bí mật ngoài Git | `.env` quyền `600`, được `.gitignore` loại trừ |
-| User database riêng, quyền trong database bài làm | phpMyAdmin dùng `qlsv_app`; xem `SHOW GRANTS FOR CURRENT_USER;` |
-| Hạn chế quyền ứng dụng, security headers | Kiểm tra `cap_drop`, `no-new-privileges` trong Compose và headers từ Nginx |
-
-Chỉ khẳng định container `app` chạy non-root sau khi kiểm tra; không suy ra mọi image đều chạy non-root. User database có quyền phục vụ migrations trong database `qlsv`, không dùng quyền quản trị toàn bộ MySQL.
-
-## 9. Tạo commit 1 sau khi demo đạt
-
-Nếu chưa có Git, cài `sudo apt install -y git`. Khởi tạo repository trong thư mục dự án:
-
-```bash
-cd ~/quan-ly-sinh-vien
-git init
-```
-
-Nếu Git chưa biết danh tính, thay hai giá trị minh họa bằng thông tin thật rồi chạy:
-
-```bash
-git config user.name "Ten cua ban"
-git config user.email "email-cua-ban@example.com"
-```
-
-Kiểm tra bí mật đã được loại trừ và tạo commit:
-
-```bash
-git check-ignore .env
-git add README.md compose.yaml .env.example .gitignore .gitattributes app nginx scripts docs
-git diff --cached --stat
-git diff --cached --name-only
-git commit -m "feat: trien khai CRUD sinh vien voi MySQL va Nginx"
-```
-
-`git check-ignore .env` cần in `.env`; danh sách file chờ commit không được có `.env`, mật khẩu, bản sao database hoặc dữ liệu cá nhân. Không dùng `git add -f .env`. Bước này mới tạo commit ở Ubuntu; tạo repository GitHub và push sẽ làm sau khi có MSSV/tài khoản của bạn theo yêu cầu đề.
-
-## 10. Mốc 2 — giám sát
-
-[Hướng dẫn cài, kiểm tra và commit 2](docs/sdlc/moc-2/guide.md) mô tả đầy đủ thao tác. Trên mốc 1 đang chạy, sau khi chép bộ bổ sung:
+### Bước B — Prometheus và Grafana
 
 ```bash
 python3 scripts/init_monitoring.py
@@ -224,40 +88,123 @@ bash scripts/monitoring.sh up -d --wait --wait-timeout 300
 bash scripts/monitoring.sh ps
 ```
 
-| Dịch vụ | Image đã chọn | Vai trò |
-|---|---|---|
-| prometheus | prom/prometheus:v3.13.3 | Thu thập metrics mỗi 30 giây; localhost:9090 |
-| grafana | grafana/grafana:12.4.12 | Dashboard nạp sẵn; localhost:3000 |
-| cadvisor | ghcr.io/google/cadvisor:0.56.2 | Metrics container có nhãn Compose `qlsv` |
-| nginx-exporter | nginx/nginx-prometheus-exporter:1.5.3 | Đọc `stub_status` nội bộ trên cổng 8082 |
-| mysql-exporter | prom/mysqld-exporter:v0.19.0 | Đọc trạng thái/biến MySQL bằng user riêng |
+Script bổ sung các biến giám sát còn thiếu, giữ nguyên bí mật cũ. Script thiết lập tạo user `qlsv_exporter` trong MySQL đang chạy, chỉ cấp quyền metadata phục vụ các collector đã chọn và tối đa 3 kết nối; không cấp quyền đọc/sửa bảng sinh viên.
 
-Mở [Targets](http://localhost:9090/targets) để xem bốn job `UP`; kiểm tra thêm `nginx_up=1`, `mysql_up=1` và CPU/RAM của các dịch vụ `qlsv`. Mở [dashboard Grafana](http://localhost:3000/d/qlsv-overview), dùng `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` trong `.env`. Biến môi trường này chỉ khởi tạo mật khẩu Grafana khi volume mới; sửa `.env` không tự đổi mật khẩu Grafana đã lưu.
+Mở [Prometheus Targets](http://localhost:9090/targets), kiểm tra bốn job `prometheus`, `cadvisor`, `nginx`, `mysql`. Ngoài `up=1`, cần có `nginx_up=1`, `mysql_up=1` và số liệu CPU/RAM container. [Dashboard Grafana](http://localhost:3000/d/qlsv-overview) được nạp sẵn; chờ khoảng 2 phút để biểu đồ tốc độ có đủ mẫu.
 
-Prometheus giữ tối đa 1 ngày hoặc 512 MB dữ liệu block (WAL/head có thể dùng thêm đĩa). Giới hạn RAM của năm dịch vụ giám sát tổng cộng 800 MiB; đây là giới hạn, không phải số đo sử dụng thực tế. cAdvisor có quyền host/privileged để đọc số liệu; các exporter không publish cổng. User MySQL giám sát chỉ có quyền metadata, không `SELECT`/`UPDATE` bảng sinh viên. Thiết kế và nguồn upstream trong [design.md](docs/sdlc/moc-2/design.md).
-
-## 11. Mốc 3 — log tập trung
-
-[Hướng dẫn triển khai và demo LogQL](docs/sdlc/moc-3/guide.md) mô tả việc lưu commit 2, chép ZIP bổ sung, kiểm tra log và tạo commit 3. Sau khi chép bộ mốc 3 vào dự án mốc 2 đang chạy:
+### Bước C — Loki và Promtail
 
 ```bash
 python3 scripts/prepare_logging.py
 bash scripts/logging.sh config --quiet
 bash scripts/logging.sh up -d --wait --wait-timeout 300
 python3 scripts/check_logging.py
+bash scripts/logging.sh ps
 ```
 
-Script chuẩn bị tự tìm đường dẫn log Docker và thêm `DOCKER_LOG_DIR` vào `.env`, giữ nguyên các giá trị đã có. Compose tạo lại container để thêm nhãn log, giữ named volumes; website có thể gián đoạn ngắn. Promtail đọc file log và chỉ gửi log dự án `qlsv` vào Loki. Loki lắng nghe trên localhost:3100; Promtail chỉ dùng mạng nội bộ. Giới hạn RAM của hai dịch vụ lần lượt là 384 MiB và 128 MiB.
+Script tự tìm thư mục Docker JSON logs và thêm `DOCKER_LOG_DIR` vào `.env`, giữ nguyên các giá trị đã có. Compose tạo lại các container để bổ sung nhãn log, giữ named volumes; website có thể gián đoạn ngắn.
 
-`check_logging.py` tạo request 404 có mã riêng rồi tìm đúng dòng đó trong Loki. Chỉ khi script in `PASS` mới có bằng chứng log đã đi qua website → Docker → Promtail → Loki. Trong Grafana **Explore**, chọn **Loki QLSV**, chạy ba LogQL do script in ra và chụp kết quả. Loki/Promtail hiện `Up` chưa đủ chứng minh thu log thành công.
+`check_logging.py` tạo request HTTP 404 có mã riêng, rồi tìm chính dòng log mới đó trong Loki. Kết quả cần có `PASS`; trạng thái container `Up` chưa đủ chứng minh thu log thành công. Loki và Promtail không cấu hình Docker healthcheck.
 
-Giữ nguyên tài khoản Grafana và dashboard mốc 2. Kiểm tra website, dữ liệu MySQL và các biểu đồ vẫn hoạt động sau nâng cấp; lưu commit 3 sau khi log và kiểm tra hồi quy đạt.
+Trong Grafana **Explore**, chọn **Loki QLSV**, **Code**, **Last 15 minutes**, rồi chạy ba LogQL do script in ra. Ví dụ:
 
-## 12. Phần còn lại
+```logql
+{project="qlsv",service="nginx"}
+```
 
-1. Lưu và xác nhận commit 2 trên VM trước khi chép mốc 3.
-2. Triển khai Loki/Promtail trên VM, kiểm tra marker thật, demo ba truy vấn LogQL và lưu commit 3.
-3. Hoàn thiện minh chứng 3–4 biện pháp hardening và các ca CRUD/validation còn thiếu bằng chứng.
-4. Đưa mã nguồn lên GitHub theo yêu cầu MSSV, viết báo cáo tối thiểu 10 trang và diễn tập demo toàn bộ hệ thống.
+```logql
+{project="qlsv",service="nginx"} |= "moc3-demo-404"
+```
 
-Giữ lại ảnh và ghi chú kết quả từ mỗi mốc để viết báo cáo theo triển khai thực tế.
+```logql
+sum by (service) (count_over_time({project="qlsv"}[5m]))
+```
+
+Promtail đã hết hỗ trợ từ ngày 02/03/2026; bài thực hành vẫn dùng Promtail theo yêu cầu PDF. [Thông báo của Grafana](https://grafana.com/docs/loki/latest/send-data/promtail/).
+
+## 4. Truy cập và tài khoản
+
+Mở trình duyệt **bên trong Ubuntu**. `localhost` trong trình duyệt Windows là máy Windows, không phải máy ảo.
+
+| Địa chỉ | Tài khoản/cách dùng |
+|---|---|
+| [Website](http://localhost:8080) | Tài khoản tạo bằng `createsuperuser`; chuyển đến `/admin/` |
+| [phpMyAdmin](http://localhost:8081) | `MYSQL_USER` và `MYSQL_PASSWORD` trong `.env`; database `qlsv`, server `db` |
+| [Grafana](http://localhost:3000) | `GRAFANA_ADMIN_USER` và `GRAFANA_ADMIN_PASSWORD` trong `.env` |
+| [Prometheus](http://localhost:9090) | Xem Targets và chạy PromQL |
+| [Health ứng dụng](http://localhost:8080/healthz) | HTTP 200 và `{"status":"ok"}` khi truy cập database được |
+| [Loki readiness](http://localhost:3100/ready) | HTTP 200 khi Loki sẵn sàng; tiếp tục dùng script để kiểm tra log thật |
+
+Đọc `.env` bằng trình soạn thảo tại Ubuntu; trong Files, `Ctrl+H` hiện file ẩn. Không gửi nội dung hoặc ảnh có mật khẩu lên chat, báo cáo hay GitHub. Tài khoản Django, MySQL và Grafana là các tài khoản riêng; không dùng MySQL `root` để demo phpMyAdmin.
+
+Giữ nguyên `.env` cùng các volume. Đổi mật khẩu trong `.env` không tự đổi mật khẩu MySQL/Grafana đã lưu khi khởi tạo volume trước đó.
+
+## 5. Vận hành đủ 11 dịch vụ
+
+Sau bước C, luôn dùng `bash scripts/logging.sh ...`. Wrapper tự dùng `sudo` và ghép `compose.yaml`, `compose.monitoring.yaml`, `compose.logging.yaml`; lệnh `sudo docker compose` một file chỉ quản lý mốc 1.
+
+```bash
+# Xem trạng thái và log gần nhất
+bash scripts/logging.sh ps -a
+bash scripts/logging.sh logs --tail=80 app nginx loki promtail
+
+# Tạm dừng toàn hệ thống, giữ dữ liệu
+bash scripts/logging.sh stop
+
+# Chạy lại và kiểm tra luồng log
+bash scripts/logging.sh up -d --wait --wait-timeout 300
+python3 scripts/check_logging.py
+```
+
+Nếu chỉ cần giảm tải phần log, dùng `bash scripts/logging.sh stop promtail loki`. Chạy `up` như trên để bật lại. Named volumes lưu database, static files, Prometheus, Grafana, Loki và vị trí đọc log của Promtail.
+
+`bash scripts/logging.sh down` gỡ container/mạng nhưng giữ named volumes. **Không thêm `-v`** khi muốn giữ dữ liệu. Không xóa volume hay tạo lại `.env` để sửa lỗi đăng nhập. [Tài liệu Docker Compose về `down`](https://docs.docker.com/reference/cli/docker/compose/down/).
+
+## 6. Hardening và xử lý lỗi
+
+Bốn nhóm hardening đã có output kiểm chứng trên VM:
+
+| Nhóm | Kết quả đã quan sát |
+|---|---|
+| App non-root | UID/GID `10001` |
+| Hạn chế quyền app | Root filesystem chỉ đọc, `CapDrop=ALL`, `no-new-privileges=true` |
+| Database và mạng | `PortBindings={}`, database dùng `qlsv_data`, `Internal=true` |
+| Nginx security headers | `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, Permissions-Policy |
+
+Ngoài ra, `.env` có quyền `600`, khớp quy tắc `.gitignore`; kiểm tra file đang theo dõi và lịch sử Git không có `.env`. Kết quả này chỉ nói về `.env`, không thay thế việc rà toàn bộ bí mật trước khi public repository.
+
+Giới hạn cần nêu đúng: cAdvisor có quyền `privileged` để thu số liệu host; Promtail chạy root để đọc file log. Không khẳng định mọi container non-root. Ứng dụng vẫn có `/tmp` và volume static ghi được dù root filesystem chỉ đọc.
+
+Khi cần chẩn đoán:
+
+```bash
+bash scripts/logging.sh ps -a
+bash scripts/logging.sh logs --tail=80 db app nginx prometheus grafana loki promtail
+curl --noproxy '*' -sSI --max-time 10 http://127.0.0.1:8080/healthz
+free -h
+sudo docker stats --no-stream
+df -h /
+```
+
+| Biểu hiện | Kiểm tra |
+|---|---|
+| Cổng đang được dùng | Xem `sudo docker ps`; chỉ dừng đúng dịch vụ cũ chiếm cổng |
+| Website 502/503 | Trạng thái và log `db`, `app`, `nginx` |
+| Dashboard không có dữ liệu | Targets, `nginx_up`, `mysql_up`, labels container và khoảng thời gian |
+| Loki ready nhưng chưa thấy log | Log Promtail, cấu hình nhãn đã áp dụng, rồi chạy lại `check_logging.py` |
+| Container khởi động lại/máy chậm | RAM, swap, dung lượng và log; tăng RAM VM nếu thiếu |
+| Sai tài khoản | Phân biệt Django/MySQL/Grafana; giữ bí mật hiện có, không xóa volume |
+
+Không chia sẻ output cấu hình chứa mật khẩu; dùng `config --quiet` khi kiểm tra. Quy trình chi tiết: [demo CRUD](docs/sdlc/moc-1/demo.md), [giám sát](docs/sdlc/moc-2/guide.md), [thu log và LogQL](docs/sdlc/moc-3/guide.md), [kiểm tra cuối](docs/sdlc/final-verification/operations.md).
+
+## 7. Tài liệu theo mốc và phần còn lại
+
+Các hướng dẫn mốc 2–3 có bước chép ZIP qua VMware để phục vụ quá trình triển khai ban đầu. Với repository đầy đủ đã clone, dùng mục 3 của README này; không cần giải nén lại ZIP hoặc tạo lại ba commit lịch sử.
+
+Phần cần hoàn thiện trước khi nộp:
+
+- Bổ sung bằng chứng các ca xóa, kiểm tra điểm biên/trùng dữ liệu và bảo vệ tham chiếu theo kịch bản CRUD; kiểm tra lại dashboard sau nâng cấp.
+- Theo [hướng dẫn GitHub](docs/github-guide.md), hoàn tất repository theo yêu cầu MSSV và xác nhận push đủ mã nguồn, cấu hình, README, lịch sử commit. Chưa ghi nhận repository đã được public/push.
+- Dựa vào [đề cương báo cáo](docs/report-outline.md), viết báo cáo tối thiểu 10 trang với thông tin sinh viên, kiến trúc, cách hoạt động và ảnh kết quả thực tế; diễn tập demo đầy đủ. Cắt/che mật khẩu trước khi dùng ảnh.
+
+GitHub CLI trên Ubuntu đã xác nhận username `DTC245200028` qua `gh api user --jq .login` sau khi đổi tên. Tên tài khoản trùng MSSV theo yêu cầu đề. Chưa ghi URL repository cho đến khi repository và push được xác nhận.

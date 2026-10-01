@@ -18,3 +18,6 @@ Các panel trạng thái Nginx/MySQL dùng `nginx_up` và `mysql_up`, bổ sung 
 Thông tin commit 1 ở đây cập nhật trạng thái “chưa xác minh” trong bản minh chứng mốc 1 trước đó. Cần lưu commit 2 trước khi giải nén bộ mốc 3. Chưa có bằng chứng triển khai Loki/Promtail, ba truy vấn LogQL hoặc commit 3 trên VM.
 
 Chỉ lưu tóm tắt bằng chứng, không lưu ảnh hay mật khẩu trong tài liệu này. Cắt hoặc che phần mật khẩu trong ảnh trước khi đưa vào báo cáo hoặc GitHub.
+
+
+Cập nhật tiếp ngày 2026-10-02: ảnh Terminal sau khi restart Loki/Promtail xác nhận commit 2 `efb31b9` trên `master`, sau commit 1 `2fa2384`. Trạng thái chưa có bằng chứng commit 2 ở bảng trên là trạng thái tại lần ghi nhận ban đầu. Logging và commit 3 đã được xác nhận sau đó tại [minh chứng mốc 3](../moc-3/runtime-evidence.md); kiểm tra lại dashboard metrics sau nâng cấp còn cần bổ sung bằng chứng.
