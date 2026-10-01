@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+.venv/
+.agent-memory/
+__pycache__/
+*.py[cod]
+*.sqlite3
+app/staticfiles/
+output/
+tmp/
+*.log
+.DS_Store
+Thumbs.db
