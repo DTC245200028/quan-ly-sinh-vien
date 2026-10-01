@@ -1,10 +1,12 @@
 # Đề tài 2 — Hệ thống quản lý sinh viên
 
-Bộ mã nguồn mốc 1 và 2: website Django quản lý lớp, sinh viên, môn học và điểm; MySQL lưu dữ liệu; phpMyAdmin quản trị database; Nginx tiếp nhận truy cập. Mốc 2 bổ sung Prometheus/Grafana và exporters. Tất cả dịch vụ chạy bằng Docker Compose trên Ubuntu.
+Bộ mã nguồn mốc 1–3: website Django quản lý lớp, sinh viên, môn học và điểm; MySQL lưu dữ liệu; phpMyAdmin quản trị database; Nginx tiếp nhận truy cập. Mốc 2 bổ sung Prometheus/Grafana và exporters; mốc 3 bổ sung Loki/Promtail và LogQL. Tất cả dịch vụ chạy bằng Docker Compose trên Ubuntu.
 
-Mốc 1 đã có bằng chứng chạy trên VM và giữ dữ liệu sau restart. Mốc 2 có mã/config và hướng dẫn, cần kiểm chứng số liệu thật trên VM. Loki + Promtail, 2–3 truy vấn LogQL và báo cáo tối thiểu 10 trang là phần còn lại. Không coi mã nguồn có sẵn là bằng chứng mọi mốc đã hoạt động.
+Mốc 1 đã có bằng chứng chạy trên VM và giữ dữ liệu sau restart. Mốc 2 đã có dashboard với số liệu container, Nginx và MySQL; xem [minh chứng mốc 2](docs/sdlc/moc-2/runtime-evidence.md). Commit 1 trên VM đã được xác nhận (`2fa2384`); commit 2 chưa được xác nhận. Mốc 3 đã có bộ mã và hướng dẫn ở workspace, đang chờ triển khai và kiểm tra log thật trên VM. Báo cáo và kiểm chứng các yêu cầu còn lại chưa hoàn tất.
 
-**Đang nâng cấp từ mốc 1:** làm theo [hướng dẫn mốc 2](docs/sdlc/moc-2/guide.md), lưu commit 1 trước khi giải nén bản mới. Sau nâng cấp, dùng `bash scripts/monitoring.sh ...` để quản lý cả chín dịch vụ; `sudo docker compose ...` một file chỉ quản lý phần mốc 1.
+**Đang nâng cấp từ mốc 2:** làm theo [hướng dẫn mốc 3](docs/sdlc/moc-3/guide.md), lưu commit 2 trước khi giải nén bản mới. Sau nâng cấp, dùng `bash scripts/logging.sh ...` để quản lý đủ 11 dịch vụ. Wrapper này ghép cả ba file Compose và tự dùng `sudo` khi cần.
+
+**Cài từ đầu:** hoàn thành mốc 1 bên dưới, tiếp tục [hướng dẫn mốc 2](docs/sdlc/moc-2/guide.md), rồi mốc 3. Các mục 2–5 và 9 là hướng dẫn dựng mốc 1; không tạo lại `.env`, tài khoản hay commit 1 khi đã làm xong.
 
 ## 1. Môi trường và cấu trúc
 
@@ -111,25 +113,36 @@ Nếu chưa có `curl`, cài bằng `sudo apt install -y curl`. Ghi lại kết 
 
 ## 6. Dừng, chạy lại và giữ dữ liệu
 
-Tạm dừng khi không học:
+Chọn wrapper theo mốc đã cài để quản lý đủ dịch vụ:
+
+| Mốc đang dùng | Tiền tố lệnh |
+|---|---|
+| Mốc 1 — 4 dịch vụ | `sudo docker compose` |
+| Mốc 2 — 9 dịch vụ | `bash scripts/monitoring.sh` |
+| Mốc 3 — 11 dịch vụ | `bash scripts/logging.sh` |
+
+Ví dụ sau dành cho hệ thống đã lên mốc 3; ở mốc 1 hoặc 2, thay tiền tố bằng dòng tương ứng trong bảng. Tạm dừng khi không học:
 
 ```bash
-sudo docker compose stop
+bash scripts/logging.sh stop
 ```
 
 Chạy lại:
 
 ```bash
-sudo docker compose up -d --wait --wait-timeout 300
+bash scripts/logging.sh up -d --wait --wait-timeout 300
+python3 scripts/check_logging.py
 ```
 
-Có thể dùng `sudo docker compose down` để gỡ container và mạng của bộ Compose; named volumes vẫn được giữ. **Không thêm `-v`** khi muốn giữ database: tùy chọn đó xóa named volumes, làm mất dữ liệu và tài khoản web. Xem [phân biệt các tùy chọn `down`](https://docs.docker.com/reference/cli/docker/compose/down/).
+Lệnh `check_logging.py` chỉ chạy khi đã cài mốc 3.
+
+Có thể dùng `down` với tiền tố đúng mốc để gỡ container và mạng của bộ Compose; named volumes vẫn được giữ. **Không thêm `-v`** khi muốn giữ database: tùy chọn đó xóa named volumes, làm mất dữ liệu và tài khoản web. Xem [phân biệt các tùy chọn `down`](https://docs.docker.com/reference/cli/docker/compose/down/).
 
 Giữ nguyên `.env` và tên dự án Compose `qlsv` để sử dụng đúng database đã khởi tạo. Đổi mật khẩu trong `.env` không tự đổi mật khẩu đã lưu trong MySQL volume. Không xóa `.env` rồi tạo lại để xử lý lỗi đăng nhập.
 
 ## 7. Khi có lỗi
 
-Thu thập trạng thái và log gần nhất:
+Các lệnh sau xem lỗi của bốn dịch vụ mốc 1. Với lỗi giám sát hoặc log, dùng wrapper và mục xử lý lỗi trong [hướng dẫn mốc 2](docs/sdlc/moc-2/guide.md) hoặc [mốc 3](docs/sdlc/moc-3/guide.md).
 
 ```bash
 cd ~/quan-ly-sinh-vien
@@ -213,20 +226,38 @@ bash scripts/monitoring.sh ps
 
 | Dịch vụ | Image đã chọn | Vai trò |
 |---|---|---|
-| prometheus | prom/prometheus:v3.13.3 | Thu thập metrics mỗi30s; localhost9090 |
-| grafana | grafana/grafana:12.4.12 | Dashboard nạp sẵn; localhost3000 |
-| cadvisor | ghcr.io/google/cadvisor:0.56.2 | Metrics container có nhãn Composeqlsv |
-| nginx-exporter | nginx/nginx-prometheus-exporter:1.5.3 | Đọc stub_status nội bộ8082 |
+| prometheus | prom/prometheus:v3.13.3 | Thu thập metrics mỗi 30 giây; localhost:9090 |
+| grafana | grafana/grafana:12.4.12 | Dashboard nạp sẵn; localhost:3000 |
+| cadvisor | ghcr.io/google/cadvisor:0.56.2 | Metrics container có nhãn Compose `qlsv` |
+| nginx-exporter | nginx/nginx-prometheus-exporter:1.5.3 | Đọc `stub_status` nội bộ trên cổng 8082 |
 | mysql-exporter | prom/mysqld-exporter:v0.19.0 | Đọc trạng thái/biến MySQL bằng user riêng |
 
-Mở [Targets](http://localhost:9090/targets) để xem4jobsUP; kiểm tra thêm `nginx_up=1`, `mysql_up=1` và CPU/RAM của các dịch vụ qlsv. Mở [dashboard Grafana](http://localhost:3000/d/qlsv-overview), dùng `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` trong.env. Biến môi trường này chỉ khởi tạo mật khẩu Grafana khi volume mới; sửa.env không tự đổi mật khẩu Grafana đã lưu.
+Mở [Targets](http://localhost:9090/targets) để xem bốn job `UP`; kiểm tra thêm `nginx_up=1`, `mysql_up=1` và CPU/RAM của các dịch vụ `qlsv`. Mở [dashboard Grafana](http://localhost:3000/d/qlsv-overview), dùng `GRAFANA_ADMIN_USER`/`GRAFANA_ADMIN_PASSWORD` trong `.env`. Biến môi trường này chỉ khởi tạo mật khẩu Grafana khi volume mới; sửa `.env` không tự đổi mật khẩu Grafana đã lưu.
 
-Prometheus giữ tối đa1ngày hoặc512MB blockmetrics (WAL/head có thể dùng thêm đĩa). Giới hạn RAM của5dịch vụ giám sát tổng800MiB; đây là giới hạn, không phải số đo đã chạy. cAdvisor có quyền host/privileged để đọc số liệu; các exporter không publish cổng. User MySQL giám sát chỉ có quyền metadata, không SELECT/UPDATE bảng sinh viên. Thiết kế và nguồn upstream trong [design.md](docs/sdlc/moc-2/design.md).
+Prometheus giữ tối đa 1 ngày hoặc 512 MB dữ liệu block (WAL/head có thể dùng thêm đĩa). Giới hạn RAM của năm dịch vụ giám sát tổng cộng 800 MiB; đây là giới hạn, không phải số đo sử dụng thực tế. cAdvisor có quyền host/privileged để đọc số liệu; các exporter không publish cổng. User MySQL giám sát chỉ có quyền metadata, không `SELECT`/`UPDATE` bảng sinh viên. Thiết kế và nguồn upstream trong [design.md](docs/sdlc/moc-2/design.md).
 
-## 11. Phần còn lại
+## 11. Mốc 3 — log tập trung
 
-1. Kiểm chứng dashboard mốc2 trênVM và lưu commit2.
-2. Mốc3: Loki + Promtail, thu thập log và trình diễn2–3truy vấn LogQL; commit3.
-3. Hoàn thiện minh chứng3–4biện pháp hardening, GitHub và báo cáo tối thiểu10trang; diễn tập demo toàn bộ hệ thống.
+[Hướng dẫn triển khai và demo LogQL](docs/sdlc/moc-3/guide.md) mô tả việc lưu commit 2, chép ZIP bổ sung, kiểm tra log và tạo commit 3. Sau khi chép bộ mốc 3 vào dự án mốc 2 đang chạy:
+
+```bash
+python3 scripts/prepare_logging.py
+bash scripts/logging.sh config --quiet
+bash scripts/logging.sh up -d --wait --wait-timeout 300
+python3 scripts/check_logging.py
+```
+
+Script chuẩn bị tự tìm đường dẫn log Docker và thêm `DOCKER_LOG_DIR` vào `.env`, giữ nguyên các giá trị đã có. Compose tạo lại container để thêm nhãn log, giữ named volumes; website có thể gián đoạn ngắn. Promtail đọc file log và chỉ gửi log dự án `qlsv` vào Loki. Loki lắng nghe trên localhost:3100; Promtail chỉ dùng mạng nội bộ. Giới hạn RAM của hai dịch vụ lần lượt là 384 MiB và 128 MiB.
+
+`check_logging.py` tạo request 404 có mã riêng rồi tìm đúng dòng đó trong Loki. Chỉ khi script in `PASS` mới có bằng chứng log đã đi qua website → Docker → Promtail → Loki. Trong Grafana **Explore**, chọn **Loki QLSV**, chạy ba LogQL do script in ra và chụp kết quả. Loki/Promtail hiện `Up` chưa đủ chứng minh thu log thành công.
+
+Giữ nguyên tài khoản Grafana và dashboard mốc 2. Kiểm tra website, dữ liệu MySQL và các biểu đồ vẫn hoạt động sau nâng cấp; lưu commit 3 sau khi log và kiểm tra hồi quy đạt.
+
+## 12. Phần còn lại
+
+1. Lưu và xác nhận commit 2 trên VM trước khi chép mốc 3.
+2. Triển khai Loki/Promtail trên VM, kiểm tra marker thật, demo ba truy vấn LogQL và lưu commit 3.
+3. Hoàn thiện minh chứng 3–4 biện pháp hardening và các ca CRUD/validation còn thiếu bằng chứng.
+4. Đưa mã nguồn lên GitHub theo yêu cầu MSSV, viết báo cáo tối thiểu 10 trang và diễn tập demo toàn bộ hệ thống.
 
 Giữ lại ảnh và ghi chú kết quả từ mỗi mốc để viết báo cáo theo triển khai thực tế.

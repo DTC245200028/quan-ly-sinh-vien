@@ -1,0 +1,81 @@
+# Combine with compose.yaml and compose.monitoring.yaml via scripts/logging.sh.
+x-loki-logging: &loki-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+    labels: "com.docker.compose.project,com.docker.compose.service"
+
+services:
+  db:
+    logging: *loki-logging
+  app:
+    logging: *loki-logging
+  nginx:
+    logging: *loki-logging
+  phpmyadmin:
+    logging: *loki-logging
+  prometheus:
+    logging: *loki-logging
+  grafana:
+    logging: *loki-logging
+  cadvisor:
+    logging: *loki-logging
+  nginx-exporter:
+    logging: *loki-logging
+  mysql-exporter:
+    logging: *loki-logging
+
+  loki:
+    image: grafana/loki:3.7.8
+    restart: unless-stopped
+    user: "10001:10001"
+    command: ["-config.file=/etc/loki/config.yml"]
+    environment:
+      GOMEMLIMIT: 300MiB
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./logging/loki/config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    networks: [monitoring]
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: 384m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Distroless image: no shell/wget. Use scripts/check_logging.py from Ubuntu.
+    logging: *loki-logging
+
+  promtail:
+    image: grafana/promtail:3.6.11
+    restart: unless-stopped
+    user: "0:0"
+    command: ["-config.file=/etc/promtail/config.yml"]
+    environment:
+      GOMEMLIMIT: 96MiB
+    volumes:
+      - ./logging/promtail/config.yml:/etc/promtail/config.yml:ro
+      - type: bind
+        source: ${DOCKER_LOG_DIR:?Run python3 scripts/prepare_logging.py}
+        target: /var/lib/docker/containers
+        read_only: true
+        bind:
+          create_host_path: false
+      - promtail_positions:/positions
+    networks: [monitoring]
+    depends_on:
+      loki:
+        condition: service_started
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: 128m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *loki-logging
+
+volumes:
+  loki_data:
+  promtail_positions:

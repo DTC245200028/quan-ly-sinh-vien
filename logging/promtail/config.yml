@@ -1,0 +1,45 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+  log_level: warn
+
+tracing:
+  enabled: false
+
+positions:
+  filename: /positions/positions.yml
+  sync_period: 5s
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+    batchwait: 1s
+    batchsize: 262144
+
+scrape_configs:
+  - job_name: qlsv-docker
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: docker
+          __path__: /var/lib/docker/containers/*/*-json.log
+    pipeline_stages:
+      # Docker json-file options copy these two Compose labels into attrs.
+      - json:
+          expressions:
+            project: 'attrs."com.docker.compose.project"'
+            service: 'attrs."com.docker.compose.service"'
+          drop_malformed: true
+      - labels:
+          project:
+          service:
+      - match:
+          selector: '{project!="qlsv"}'
+          action: drop
+          drop_counter_reason: outside_qlsv
+      - match:
+          selector: '{service=""}'
+          action: drop
+          drop_counter_reason: missing_service
+      # Preserve the original Docker timestamp/stream; send the inner log text.
+      - docker: {}
+      - labeldrop: [filename]
