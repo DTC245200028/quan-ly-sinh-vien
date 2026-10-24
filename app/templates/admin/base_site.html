@@ -1,0 +1,18 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+{% block title %}{{ title }} | Quản lý sinh viên{% endblock %}
+{% block dark-mode-vars %}{% endblock %}
+{% block responsive %}{{ block.super }}
+<meta name="color-scheme" content="light">
+<link rel="stylesheet" href="{% static 'students/css/admin-ui.css' %}?v=20261011">
+<script src="{% static 'students/js/admin-ui.js' %}?v=20261011" defer></script>
+{% endblock %}
+{% block branding %}
+{% if has_permission %}<button class="ui-menu-toggle" id="qlsv-menu-toggle" type="button" aria-expanded="false" aria-controls="qlsv-sidebar" aria-label="Mở menu quản lý">{% include 'admin/includes/icon.html' with name='menu' %}</button>{% endif %}
+<a class="ui-brand" href="{% url 'admin:index' %}"><span class="ui-brand-mark">{% include 'admin/includes/icon.html' with name='cap' %}</span><span><strong>Quản lý sinh viên</strong><small>Không gian quản lý đào tạo</small></span></a>
+{% endblock %}
+{% block usertools %}{% if has_permission %}
+<div id="user-tools"><span class="ui-today">{% now 'd/m/Y' %}</span><span class="ui-account"><span class="ui-avatar" aria-hidden="true">{{ user.get_username|first|upper }}</span><strong>{% firstof user.get_short_name user.get_username %}</strong></span>{% if user.has_usable_password %}<a href="{% url 'admin:password_change' %}" class="ui-password-link">Đổi mật khẩu</a>{% endif %}<form id="logout-form" method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button type="submit" class="ui-logout">{% include 'admin/includes/icon.html' with name='logout' %}<span>Đăng xuất</span></button></form></div>
+{% endif %}{% endblock %}
+{% block nav-sidebar %}{% if has_permission %}{% include 'admin/nav_sidebar.html' %}{% endif %}{% endblock %}
+{% block footer %}<span>Hệ thống quản lý sinh viên</span><span>Lớp học · Sinh viên · Môn học · Điểm số</span>{% endblock %}

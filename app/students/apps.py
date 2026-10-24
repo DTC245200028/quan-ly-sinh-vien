@@ -1,4 +1,9 @@
 from django.apps import AppConfig
+from django.contrib.admin.apps import AdminConfig
+
+
+class StudentsAdminConfig(AdminConfig):
+    default_site = "students.admin_site.StudentAdminSite"
 
 
 class StudentsConfig(AppConfig):

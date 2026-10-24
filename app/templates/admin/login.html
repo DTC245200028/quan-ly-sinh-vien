@@ -1,0 +1,24 @@
+{% extends 'admin/base_site.html' %}
+{% load i18n %}
+{% block bodyclass %}login ui-login{% endblock %}
+{% block header %}{% endblock %}
+{% block nav-sidebar %}{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block content_title %}{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<div class="ui-login-layout">
+<section class="ui-login-intro"><a class="ui-brand" href="{% url 'admin:index' %}"><span class="ui-brand-mark">{% include 'admin/includes/icon.html' with name='cap' %}</span><strong>Quản lý sinh viên</strong></a><div><h1>Quản lý đào tạo.<br>Rõ ràng, tập trung.</h1><p>Một không gian cho hồ sơ sinh viên, lớp học, môn học và điểm số.</p><ul class="ui-login-features"><li>{% include 'admin/includes/icon.html' with name='student' %}Tra cứu hồ sơ thuận tiện</li><li>{% include 'admin/includes/icon.html' with name='grade' %}Cập nhật điểm số chính xác</li><li>{% include 'admin/includes/icon.html' with name='shield' %}Quản lý theo quyền được cấp</li></ul></div><span class="ui-login-footnote">Hệ thống quản lý sinh viên</span></section>
+<section class="ui-login-form"><div class="ui-login-form-inner"><h2>Đăng nhập</h2><p class="ui-login-description">Chào mừng bạn trở lại.<br>Sử dụng tài khoản được cấp để tiếp tục.</p>
+{% if form.errors and not form.non_field_errors %}<p class="errornote" role="alert">Vui lòng kiểm tra các trường được đánh dấu bên dưới.</p>{% endif %}
+{% for error in form.non_field_errors %}<p class="errornote" role="alert">{{ error }}</p>{% endfor %}
+{% if user.is_authenticated %}<p class="errornote" role="alert">Tài khoản {{ username }} chưa có quyền truy cập trang quản lý. Vui lòng đăng nhập bằng tài khoản được cấp quyền.</p>{% endif %}
+<form action="{{ app_path }}" method="post" id="login-form">{% csrf_token %}
+<div class="form-row">{{ form.username.errors }}<label for="{{ form.username.id_for_label }}">Tên đăng nhập</label>{{ form.username }}</div>
+<div class="form-row">{{ form.password.errors }}<label for="{{ form.password.id_for_label }}">Mật khẩu</label><div class="ui-password-field">{{ form.password }}<button type="button" id="ui-password-toggle" aria-label="Hiện mật khẩu" aria-pressed="false" hidden>{% include 'admin/includes/icon.html' with name='eye' %}</button></div></div>
+<input type="hidden" name="next" value="{{ next }}">
+{% url 'admin_password_reset' as password_reset_url %}{% if password_reset_url %}<p><a href="{{ password_reset_url }}">Quên mật khẩu?</a></p>{% endif %}
+<button type="submit" class="ui-button ui-button-primary ui-login-submit">Đăng nhập {% include 'admin/includes/icon.html' with name='arrow' %}</button>
+</form><p class="ui-login-help">Chưa có tài khoản? Liên hệ người quản trị hệ thống.</p></div></section>
+</div>
+{% endblock %}

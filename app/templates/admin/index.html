@@ -1,0 +1,25 @@
+{% extends 'admin/base_site.html' %}
+{% load i18n %}
+{% block bodyclass %}{{ block.super }} ui-dashboard{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block content_title %}{% endblock %}
+{% block content %}
+{% if qlsv_dashboard %}
+<div class="ui-page-heading"><div><h1>Tổng quan</h1><p>Nắm bắt dữ liệu đào tạo, bắt đầu công việc hôm nay.</p></div>{% if qlsv_dashboard.can_add_student %}<a class="ui-button ui-button-primary" href="{{ qlsv_dashboard.add_student_url }}">{% include 'admin/includes/icon.html' with name='plus' %}Thêm sinh viên</a>{% endif %}</div>
+{% if qlsv_dashboard.cards %}
+<section class="ui-stats" aria-label="Thống kê dữ liệu">{% for card in qlsv_dashboard.cards %}<a class="ui-stat" href="{{ card.url }}"><span class="ui-stat-label">{% include 'admin/includes/icon.html' with name=card.key %}{{ card.label }}</span><strong>{{ card.value }}</strong><span class="ui-stat-bottom">Xem danh sách {% include 'admin/includes/icon.html' with name='arrow' %}</span></a>{% endfor %}</section>
+{% else %}<section class="ui-panel ui-empty"><h2>Chưa có quyền xem dữ liệu</h2><p>Liên hệ người quản trị để được cấp quyền phù hợp với công việc.</p></section>{% endif %}
+<div class="ui-overview-grid">
+{% if qlsv_dashboard.can_view_classrooms %}
+<section class="ui-panel ui-classrooms"><div class="ui-panel-heading"><div><h2>Sinh viên theo lớp</h2><p>Tối đa 6 lớp có nhiều sinh viên nhất</p></div><span class="ui-panel-icon">{% include 'admin/includes/icon.html' with name='classroom' %}</span></div>
+{% if qlsv_dashboard.classrooms %}<div class="ui-table-scroll"><table class="ui-table"><thead><tr><th scope="col">Lớp học</th><th scope="col" class="ui-number">Sinh viên</th><th scope="col"><span class="visually-hidden">Chi tiết</span></th></tr></thead><tbody>{% for classroom in qlsv_dashboard.classrooms %}<tr><td><a href="{{ classroom.url }}">{{ classroom.code }}</a><span class="ui-table-detail">{{ classroom.name }}</span></td><td class="ui-number">{{ classroom.student_count }}</td><td><a class="ui-row-arrow" href="{{ classroom.url }}" aria-label="Xem lớp {{ classroom.code }}">{% include 'admin/includes/icon.html' with name='arrow' %}</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="ui-empty"><p>Chưa có lớp học.</p><p>Tạo lớp học để bắt đầu sắp xếp hồ sơ sinh viên.</p></div>{% endif %}</section>
+{% endif %}
+{% if qlsv_dashboard.can_view_grades %}
+<section class="ui-panel ui-grades"><div class="ui-panel-heading"><div><h2>Phân bố điểm số</h2><p>Theo số bản ghi điểm, thang điểm 10</p></div><span class="ui-panel-icon">{% include 'admin/includes/icon.html' with name='grade' %}</span></div>
+{% if qlsv_dashboard.grade_count %}<div class="ui-grade-average"><span>Điểm trung bình</span><strong>{{ qlsv_dashboard.grade_average|floatformat:2 }}<small> / 10</small></strong></div><div class="ui-grade-bands">{% for band in qlsv_dashboard.grade_bands %}<div class="ui-grade-band"><div><span>{{ band.label }}</span><strong>{{ band.count }} <small>bản ghi</small></strong></div><meter min="0" max="100" value="{{ band.percent|stringformat:'.0f' }}" aria-label="{{ band.label }}: {{ band.count }} bản ghi">{{ band.percent }}%</meter></div>{% endfor %}</div>{% else %}<div class="ui-empty"><p>Chưa có điểm số.</p><p>Thêm điểm cho sinh viên để xem phân bố tại đây.</p></div>{% endif %}</section>
+{% endif %}
+</div>
+{% if qlsv_dashboard.cards %}<section class="ui-panel ui-activity"><div class="ui-panel-heading"><div><h2>Hoạt động của bạn</h2><p>Những thay đổi gần đây trong hệ thống</p></div>{% include 'admin/includes/icon.html' with name='clock' %}</div>
+{% if qlsv_dashboard.recent_activity %}<ul class="ui-activity-list">{% for entry in qlsv_dashboard.recent_activity %}<li><span class="ui-activity-dot" aria-hidden="true"></span><div><span class="ui-activity-label">{{ entry.action_label }} · {{ entry.model_label }}</span>{% if entry.url %}<a href="{{ entry.url }}">{{ entry.object_label }}</a>{% else %}<strong>{{ entry.object_label }}</strong>{% endif %}</div><time datetime="{{ entry.time|date:'c' }}">{{ entry.time|date:'H:i · d/m/Y' }}</time></li>{% endfor %}</ul>{% else %}<div class="ui-empty ui-empty-inline">{% include 'admin/includes/icon.html' with name='clock' %}<div><strong>Chưa có hoạt động nào</strong><p>Thao tác thêm, sửa và xóa của bạn sẽ xuất hiện tại đây.</p></div></div>{% endif %}</section>{% endif %}
+{% else %}<h1>{{ title }}</h1>{% include 'admin/app_list.html' with app_list=app_list show_changelinks=True %}{% endif %}
+{% endblock %}

@@ -3,11 +3,6 @@ from django.contrib import admin
 from .models import ClassRoom, Grade, Student, Subject
 
 
-admin.site.site_header = "Hệ thống quản lý sinh viên"
-admin.site.site_title = "Quản lý sinh viên"
-admin.site.index_title = "Quản lý dữ liệu"
-
-
 @admin.register(ClassRoom)
 class ClassRoomAdmin(admin.ModelAdmin):
     list_display = ["code", "name"]

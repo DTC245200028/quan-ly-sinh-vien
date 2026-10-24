@@ -1,0 +1,12 @@
+<aside class="ui-sidebar" id="qlsv-sidebar" aria-label="Menu quản lý">
+  <nav aria-label="Điều hướng chính">
+    {% url 'admin:index' as dashboard_url %}
+    <a href="{{ dashboard_url }}" class="ui-nav-link{% if request.path == dashboard_url %} is-active{% endif %}"{% if request.path == dashboard_url %} aria-current="page"{% endif %}>{% include 'admin/includes/icon.html' with name='overview' %}<span>Tổng quan</span></a>
+    <p class="ui-nav-heading">Quản lý đào tạo</p>
+    {% for item in qlsv_navigation %}<a href="{{ item.url }}" class="ui-nav-link{% if item.url in request.path %} is-active{% endif %}"{% if item.url in request.path %} aria-current="page"{% endif %}>{% include 'admin/includes/icon.html' with name=item.key %}<span>{{ item.label }}</span></a>{% empty %}<p class="ui-nav-empty">Bạn chưa được cấp quyền quản lý dữ liệu.</p>{% endfor %}
+    {% for app in available_apps %}{% if app.app_label != 'students' %}<p class="ui-nav-heading">{{ app.name }}</p>{% for model in app.models %}{% if model.admin_url %}<a class="ui-nav-link{% if model.admin_url in request.path %} is-active{% endif %}" href="{{ model.admin_url }}"{% if model.admin_url in request.path %} aria-current="page"{% endif %}>{% include 'admin/includes/icon.html' with name='shield' %}<span>{{ model.name }}</span></a>{% elif model.add_url %}<a class="ui-nav-link" href="{{ model.add_url }}">{% include 'admin/includes/icon.html' with name='plus' %}<span>Thêm {{ model.name|lower }}</span></a>{% endif %}{% endfor %}{% endif %}{% endfor %}
+    {% for item in qlsv_add_only_navigation %}<a class="ui-nav-link" href="{{ item.url }}">{% include 'admin/includes/icon.html' with name='plus' %}<span>{{ item.label }}</span></a>{% endfor %}
+    {% if user.has_usable_password %}<a class="ui-nav-link ui-mobile-password" href="{% url 'admin:password_change' %}">{% include 'admin/includes/icon.html' with name='shield' %}<span>Đổi mật khẩu</span></a>{% endif %}
+  </nav>
+  <div class="ui-sidebar-note">{% include 'admin/includes/icon.html' with name='cap' %}<strong>Gọn gàng dữ liệu.<br>Thuận tiện quản lý.</strong><span>Tra cứu, cập nhật và theo dõi<br>trong cùng một không gian.</span></div>
+</aside>
